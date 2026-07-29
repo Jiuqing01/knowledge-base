@@ -38,6 +38,10 @@ public interface FileRepository extends JpaRepository<File, Long> {
 
     Page<File> searchByOriginalNameContainingAndIsDeleted(String originalName, Integer isDeleted, Pageable pageable);
 
+    Page<File> findByOwnerIdAndIsDeleted(Long ownerId, Integer isDeleted, Pageable pageable);
+
+    Page<File> findByOwnerIdAndOriginalNameContainingAndIsDeleted(Long ownerId, String originalName, Integer isDeleted, Pageable pageable);
+
     @Query("SELECT COALESCE(SUM(f.fileSize), 0) FROM File f WHERE f.ownerId = :ownerId AND f.isDeleted = :isDeleted")
     Long sumFileSizeByOwnerIdAndIsDeleted(@Param("ownerId") Long ownerId, @Param("isDeleted") Integer isDeleted);
 }

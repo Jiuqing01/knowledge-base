@@ -520,8 +520,8 @@ const loadUsers = async () => {
       keyword: userSearch.value
     })
     
-    users.value = res.data?.content || []
-    totalUsers.value = res.data?.total || 0
+    users.value = res.success ? (res.data?.content || []) : []
+    totalUsers.value = res.success ? (res.data?.total || 0) : 0
   } catch (error) {
     console.error('加载用户失败:', error)
   } finally {
@@ -684,7 +684,7 @@ const whitelistForm = reactive({
 const loadWhitelist = async () => {
   try {
     const res = await adminAPI.getConfig()
-    whitelistForm.extensions = res.data?.allowed_file_extensions?.configValue || ''
+    whitelistForm.extensions = res.success ? (res.data?.allowed_file_extensions?.configValue || '') : ''
   } catch (error) {
     console.error('加载配置失败:', error)
   }
@@ -738,7 +738,7 @@ const templateTree = computed(() => {
 const loadTemplates = async () => {
   try {
     const res = await adminAPI.getFolderTemplates()
-    templateForm.templates = res.data?.configValue || ''
+    templateForm.templates = res.success ? (res.data?.configValue || '') : ''
   } catch (error) {
     console.error('加载模板失败:', error)
   }

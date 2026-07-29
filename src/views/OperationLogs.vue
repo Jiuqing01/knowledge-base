@@ -67,6 +67,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, Download } from '@element-plus/icons-vue'
 import { adminAPI } from '@/api'
+import * as XLSX from 'xlsx'
 
 const searchKeyword = ref('')
 const dateRange = ref([])
@@ -146,8 +147,35 @@ const loadLogs = async () => {
   }
 }
 
-const handleExport = () => {
-  ElMessage.info('导出功能开发中')
+const handleExport = async () => {
+  if (logs.value.length === 0) {
+    ElMessage.warning('没有数据可导出')
+    return
+  }
+  
+  try {
+    const exportData = logs.value.map(log => ({
+      'ID': log.id,
+      '用户ID': log.userId,
+      '操作类型': getOperationLabel(log.action),
+      '目标类型': log.targetType,
+      '目标ID': log.targetId,
+      '操作详情': log.details,
+      'IP地址': log.ipAddress,
+      '操作时间': formatDate(log.createdAt)
+    }))
+    
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '操作日志')
+    
+    const fileName = `操作日志_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.xlsx`
+    XLSX.writeFile(workbook, fileName)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 onMounted(() => {

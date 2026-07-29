@@ -224,12 +224,19 @@ public class AdminController {
     public ResponseEntity<ApiResponse<Page<Map<String, Object>>>> getAllFiles(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long userId) {
         
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<edu.ngd.entity.File> files;
         
-        if (keyword != null && !keyword.trim().isEmpty()) {
+        if (userId != null) {
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                files = fileRepository.findByOwnerIdAndOriginalNameContainingAndIsDeleted(userId, keyword.trim(), 0, pageable);
+            } else {
+                files = fileRepository.findByOwnerIdAndIsDeleted(userId, 0, pageable);
+            }
+        } else if (keyword != null && !keyword.trim().isEmpty()) {
             files = fileRepository.searchByOriginalNameContainingAndIsDeleted(keyword.trim(), 0, pageable);
         } else {
             files = fileRepository.findByIsDeleted(0, pageable);

@@ -9,6 +9,10 @@
         @input="loadFiles"
       />
       <div class="toolbar-actions">
+        <el-select v-model="selectedUserId" placeholder="按用户筛选" clearable @change="loadFiles">
+          <el-option label="全部用户" value="" />
+          <el-option v-for="user in users" :key="user.id" :label="user.username" :value="user.id" />
+        </el-select>
         <el-select v-model="fileType" placeholder="文件类型" @change="loadFiles">
           <el-option label="全部" value="" />
           <el-option label="文档" value="doc" />
@@ -32,7 +36,7 @@
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="name" label="文件名" min-width="200">
         <template #default="{ row }">
-          <div class="file-cell">
+          <div class="file-cell" @click="handlePreview(row)">
             <span class="file-icon">{{ getFileIcon(row) }}</span>
             <span>{{ row.originalName }}</span>
           </div>
@@ -68,9 +72,10 @@
           {{ formatDate(row.createdAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right">
+      <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button size="small" text @click="handlePreview(row)">预览</el-button>
+          <el-button size="small" text type="primary" @click="handleDownload(row)">下载</el-button>
           <el-button size="small" text type="danger" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -89,22 +94,64 @@
       />
     </div>
   </div>
+
+  <el-dialog v-model="previewVisible" :title="'预览: ' + (previewFile?.originalName || '')" width="800px" top="5vh">
+    <div v-if="previewLoading" class="preview-loading">
+      <el-icon :size="48"><Document /></el-icon>
+      <p>正在加载...</p>
+    </div>
+    <div v-else-if="previewError" class="preview-error">
+      <el-icon :size="48"><Document /></el-icon>
+      <p>{{ previewError }}</p>
+      <el-button type="primary" @click="handlePreview(previewFile)">重新加载</el-button>
+    </div>
+    <div v-else-if="isImageFile(previewFile)" class="preview-image">
+      <img :src="previewUrl" alt="图片预览" />
+    </div>
+    <div v-else-if="isTextFile(previewFile)" class="preview-text">
+      <pre>{{ previewText }}</pre>
+    </div>
+    <div v-else-if="isWordFile(previewFile)" class="preview-word">
+      <pre>{{ previewText }}</pre>
+    </div>
+    <div v-else class="preview-other">
+      <el-icon :size="64"><Document /></el-icon>
+      <p>无法预览此类型文件</p>
+      <p class="file-info">文件类型: {{ previewFile?.mimeType }}</p>
+      <p class="file-info">文件大小: {{ formatSize(previewFile?.fileSize) }}</p>
+      <el-button type="primary" @click="handleDownload(previewFile)">下载文件</el-button>
+    </div>
+    <template #footer>
+      <el-button @click="previewVisible = false">关闭</el-button>
+      <el-button type="primary" @click="handleDownload(previewFile)">下载文件</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Download, Delete } from '@element-plus/icons-vue'
-import { adminAPI } from '@/api'
+import { Refresh, Download, Delete, Document } from '@element-plus/icons-vue'
+import { adminAPI, fileAPI } from '@/api'
+import * as XLSX from 'xlsx'
 
 const searchKeyword = ref('')
 const fileType = ref('')
+const selectedUserId = ref('')
 const loading = ref(false)
 const files = ref([])
+const users = ref([])
 const selectedFiles = ref([])
 const page = ref(1)
 const pageSize = ref(10)
 const totalFiles = ref(0)
+
+const previewVisible = ref(false)
+const previewLoading = ref(false)
+const previewError = ref('')
+const previewUrl = ref('')
+const previewText = ref('')
+const previewFile = ref(null)
 
 const getFileIcon = (row) => {
   const type = getFileType(row)
@@ -165,7 +212,15 @@ const formatDate = (dateStr) => {
 const loadFiles = async () => {
   loading.value = true
   try {
-    const res = await adminAPI.getAllFiles(page.value - 1, pageSize.value, searchKeyword.value)
+    const params = {
+      page: page.value - 1,
+      size: pageSize.value,
+      keyword: searchKeyword.value
+    }
+    if (selectedUserId.value) {
+      params.userId = selectedUserId.value
+    }
+    const res = await adminAPI.getAllFiles(params)
     if (res.success && res.data) {
       files.value = res.data.content || []
       totalFiles.value = res.data.totalElements || 0
@@ -182,12 +237,128 @@ const loadFiles = async () => {
   }
 }
 
+const loadUsers = async () => {
+  try {
+    const res = await adminAPI.getUsers({ page: 0, size: 100 })
+    if (res.success && res.data) {
+      users.value = res.data.content || []
+    }
+  } catch (error) {
+    console.error('加载用户失败:', error)
+  }
+}
+
 const handleSelectionChange = (val) => {
   selectedFiles.value = val
 }
 
-const handlePreview = (row) => {
-  ElMessage.info(`预览文件: ${row.originalName}`)
+const handlePreview = async (file) => {
+  previewFile.value = file
+  previewVisible.value = true
+  previewLoading.value = true
+  previewError.value = ''
+  previewUrl.value = ''
+  previewText.value = ''
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    
+    if (isPdfFile(file)) {
+      const url = `/api/files/preview/${file.id}?token=${encodeURIComponent(token)}`
+      const a = document.createElement('a')
+      a.href = url
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      previewVisible.value = false
+      return
+    }
+    
+    const response = await fetch(`/api/files/preview/${file.id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('预览失败')
+    }
+    
+    const blob = await response.blob()
+    
+    if (isImageFile(file)) {
+      previewUrl.value = window.URL.createObjectURL(blob)
+    } else if (isTextFile(file)) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        previewText.value = e.target.result
+      }
+      reader.readAsText(blob)
+    } else if (isWordFile(file)) {
+      try {
+        const mammoth = await import('mammoth')
+        const arrayBuffer = await blob.arrayBuffer()
+        const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+        previewText.value = result.value
+      } catch (wordError) {
+        console.error('Word预览失败:', wordError)
+        previewError.value = 'Word文件预览失败，请下载查看'
+      }
+    }
+  } catch (error) {
+    console.error('预览失败:', error)
+    previewError.value = error.message || '预览失败'
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+const isImageFile = (file) => {
+  if (!file || !file.mimeType) return false
+  return file.mimeType.startsWith('image/')
+}
+
+const isTextFile = (file) => {
+  if (!file || !file.mimeType) return false
+  const textTypes = [
+    'text/plain',
+    'text/html',
+    'text/css',
+    'text/javascript',
+    'application/json',
+    'application/xml',
+    'text/markdown',
+    'text/x-markdown'
+  ]
+  return textTypes.includes(file.mimeType)
+}
+
+const isPdfFile = (file) => {
+  if (!file || !file.mimeType) return false
+  return file.mimeType === 'application/pdf'
+}
+
+const isWordFile = (file) => {
+  if (!file || !file.mimeType) return false
+  return file.mimeType.includes('word') || file.mimeType.includes('docx') || 
+         file.mimeType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+}
+
+const handleDownload = async (row) => {
+  try {
+    const token = localStorage.getItem('accessToken')
+    const url = `/api/files/download/${row.id}?token=${encodeURIComponent(token)}`
+    const a = document.createElement('a')
+    a.href = url
+    a.download = row.originalName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } catch (error) {
+    ElMessage.error('下载失败')
+  }
 }
 
 const handleDelete = async (row) => {
@@ -219,12 +390,39 @@ const handleBatchDelete = async () => {
   }
 }
 
-const handleExport = () => {
-  ElMessage.info('导出功能开发中')
+const handleExport = async () => {
+  if (files.value.length === 0) {
+    ElMessage.warning('没有数据可导出')
+    return
+  }
+  
+  try {
+    const exportData = files.value.map(file => ({
+      'ID': file.id,
+      '文件名': file.originalName,
+      '类型': getFileTypeLabel(file),
+      '大小': formatSize(file.fileSize),
+      '所有者': file.ownerUsername || '-',
+      '所属文件夹': file.folderName || '-',
+      '创建时间': formatDate(file.createdAt)
+    }))
+    
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '所有文件')
+    
+    const fileName = `所有文件_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.xlsx`
+    XLSX.writeFile(workbook, fileName)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 onMounted(() => {
   loadFiles()
+  loadUsers()
 })
 </script>
 
@@ -256,6 +454,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
 }
 
 .file-icon {
@@ -292,5 +491,53 @@ onMounted(() => {
 .total-count {
   font-size: 14px;
   color: #666;
+}
+
+.preview-loading,
+.preview-error,
+.preview-other {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #666;
+}
+
+.preview-image {
+  text-align: center;
+  padding: 20px;
+}
+
+.preview-image img {
+  max-width: 100%;
+  max-height: 500px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.preview-text,
+.preview-word {
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.preview-text pre,
+.preview-word pre {
+  margin: 0;
+  font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.preview-other .file-info {
+  font-size: 13px;
+  color: #999;
+  margin-top: 8px;
 }
 </style>

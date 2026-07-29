@@ -58,7 +58,7 @@
         <el-table-column type="selection" width="40" />
         <el-table-column prop="originalName" label="文件名" min-width="100" sortable align="left" header-align="left">
           <template #default="{ row }">
-            <div class="file-name-cell">
+            <div class="file-name-cell" @click="handlePreview(row)">
               <el-icon :class="getFileIconClass(row)"><component :is="getFileIcon(row)" /></el-icon>
               <span>{{ row.originalName }}</span>
             </div>
@@ -210,6 +210,45 @@
         <el-button type="primary" @click="handleAddTags">确认</el-button>
       </template>
     </el-dialog>
+    
+    <el-dialog v-model="previewVisible" :title="previewFile?.originalName || '文件预览'" width="900px" top="5%" draggable>
+      <div class="preview-content">
+        <div v-if="previewLoading" class="preview-loading">
+          <el-icon :size="48"><Loading /></el-icon>
+          <span class="loading-text">加载中...</span>
+        </div>
+        <div v-else-if="previewError" class="preview-error">
+          <el-icon><Document /></el-icon>
+          <span>{{ previewError }}</span>
+          <el-button type="primary" @click="handlePreview(previewFile)">重新加载</el-button>
+        </div>
+        <div v-else-if="isImageFile(previewFile)" class="preview-image">
+          <img :src="previewUrl" alt="图片预览" />
+        </div>
+        <div v-else-if="isTextFile(previewFile)" class="preview-text">
+          <pre>{{ previewText }}</pre>
+        </div>
+        <div v-else-if="isWordFile(previewFile)" class="preview-word">
+          <pre>{{ previewText }}</pre>
+        </div>
+        <div v-else-if="isPdfFile(previewFile)" class="preview-pdf">
+          <object :data="previewUrl" type="application/pdf" width="100%" height="600px">
+            <p>您的浏览器不支持 PDF 预览，请点击下方按钮下载查看。</p>
+          </object>
+        </div>
+        <div v-else class="preview-other">
+          <el-icon :size="64"><Document /></el-icon>
+          <p>无法预览此类型文件</p>
+          <p class="file-info">文件类型: {{ previewFile?.mimeType }}</p>
+          <p class="file-info">文件大小: {{ formatFileSize(previewFile?.fileSize) }}</p>
+          <el-button type="primary" @click="handleDownload(previewFile)">下载文件</el-button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="previewVisible = false">关闭</el-button>
+        <el-button type="primary" @click="handleDownload(previewFile)">下载文件</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -219,10 +258,11 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Upload, Download, Search,
-  Document, Picture, Edit, Delete, UploadFilled, FolderAdd
+  Document, Picture, Edit, Delete, UploadFilled, FolderAdd, Loading
 } from '@element-plus/icons-vue'
 import { fileAPI, tagAPI, folderAPI } from '@/api'
 import { useFolderStore } from '@/stores/folder'
+
 
 const route = useRoute()
 
@@ -236,6 +276,23 @@ const selectedFiles = ref([])
 const sortOrder = ref(null)
 
 const folderStore = useFolderStore()
+
+watch(() => route.query.keyword, (newKeyword) => {
+  if (newKeyword) {
+    searchKeyword.value = newKeyword
+    currentPage.value = 1
+    loadFiles()
+  }
+}, { immediate: true })
+
+const previewVisible = ref(false)
+const previewLoading = ref(false)
+const previewError = ref('')
+const previewUrl = ref('')
+const previewText = ref('')
+const previewHtml = ref('')
+const previewFile = ref(null)
+
 
 const loadFiles = async () => {
   loading.value = true
@@ -257,7 +314,7 @@ const loadFiles = async () => {
       res = await fileAPI.getFiles(params)
     }
     
-    let data = res.data || []
+    let data = res.success ? (res.data || []) : []
     
     if (searchKeyword.value && !tagId) {
       data = data.filter(f => f.originalName && f.originalName.toLowerCase().includes(searchKeyword.value.toLowerCase()))
@@ -326,7 +383,7 @@ const handleCreateFolder = async () => {
 const loadFolders = async () => {
   try {
     const res = await folderAPI.getFolders()
-    folderStore.setFolders(res.data || [])
+    folderStore.setFolders(res.success ? (res.data || []) : [])
   } catch (error) {
     console.error('加载文件夹失败:', error)
   }
@@ -514,7 +571,7 @@ const handleTagFilter = async () => {
   if (selectedTag.value) {
     try {
       const res = await fileAPI.getFilesByTag(selectedTag.value)
-      files.value = res.data || []
+      files.value = res.success ? (res.data || []) : []
       totalFiles.value = files.value.length
     } catch (error) {
       console.error('按标签筛选失败:', error)
@@ -579,7 +636,7 @@ const showAddTagDialog = async (file) => {
   
   try {
     const res = await tagAPI.getTags()
-    availableTags.value = res.data || []
+    availableTags.value = res.success ? (res.data || []) : []
   } catch (error) {
     console.error('加载标签失败:', error)
   }
@@ -613,7 +670,7 @@ const handleAddTags = async () => {
 const loadTags = async () => {
   try {
     const res = await tagAPI.getTags()
-    availableTags.value = res.data || []
+    availableTags.value = res.success ? (res.data || []) : []
   } catch (error) {
     console.error('加载标签失败:', error)
     availableTags.value = []
@@ -629,6 +686,100 @@ watch(() => route.query.tagId, () => {
   currentPage.value = 1
   loadFiles()
 })
+
+const handlePreview = async (file) => {
+  previewFile.value = file
+  previewVisible.value = true
+  previewLoading.value = true
+  previewError.value = ''
+  previewUrl.value = ''
+  previewText.value = ''
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    
+    if (isPdfFile(file)) {
+      const url = `/api/files/preview/${file.id}?token=${encodeURIComponent(token)}`
+      const a = document.createElement('a')
+      a.href = url
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      previewVisible.value = false
+      return
+    }
+    
+    const response = await fetch(`/api/files/preview/${file.id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('预览失败')
+    }
+    
+    const blob = await response.blob()
+    
+    if (isImageFile(file)) {
+      previewUrl.value = window.URL.createObjectURL(blob)
+    } else if (isTextFile(file)) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        previewText.value = e.target.result
+      }
+      reader.readAsText(blob)
+    } else if (isWordFile(file)) {
+      try {
+        const mammoth = await import('mammoth')
+        const arrayBuffer = await blob.arrayBuffer()
+        const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+        previewText.value = result.value
+      } catch (wordError) {
+        console.error('Word预览失败:', wordError)
+        previewError.value = 'Word文件预览失败，请下载查看'
+      }
+    }
+  } catch (error) {
+    console.error('预览失败:', error)
+    previewError.value = error.message || '预览失败'
+  } finally {
+    previewLoading.value = false
+  }
+}
+
+const isImageFile = (file) => {
+  if (!file || !file.mimeType) return false
+  return file.mimeType.startsWith('image/')
+}
+
+const isTextFile = (file) => {
+  if (!file || !file.mimeType) return false
+  const textTypes = [
+    'text/plain',
+    'text/html',
+    'text/css',
+    'text/javascript',
+    'application/json',
+    'application/xml',
+    'text/markdown',
+    'text/x-markdown'
+  ]
+  return textTypes.includes(file.mimeType)
+}
+
+const isPdfFile = (file) => {
+  if (!file || !file.mimeType) return false
+  return file.mimeType === 'application/pdf'
+}
+
+const isWordFile = (file) => {
+  if (!file || !file.mimeType) return false
+  return file.mimeType.includes('word') || file.mimeType.includes('docx') || 
+         file.mimeType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+}
 
 onMounted(() => {
   loadFiles()
@@ -851,5 +1002,122 @@ onMounted(() => {
 .no-tags {
   color: #999;
   font-size: 12px;
+}
+
+.file-name-cell {
+  cursor: pointer;
+}
+
+.file-name-cell:hover span {
+  color: #409eff;
+  text-decoration: underline;
+}
+
+.preview-content {
+  min-height: 400px;
+}
+
+.preview-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 16px;
+}
+
+.preview-loading .loading-text {
+  color: #999;
+  font-size: 14px;
+}
+
+.preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 16px;
+  color: #f56c6c;
+}
+
+.preview-error el-icon {
+  font-size: 48px;
+}
+
+.preview-image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: 600px;
+  overflow: auto;
+}
+
+.preview-image img {
+  max-width: 100%;
+  max-height: 600px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.preview-text {
+  max-height: 600px;
+  overflow: auto;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.preview-text pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+  margin: 0;
+}
+
+.preview-word {
+  max-height: 600px;
+  overflow: auto;
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e8e8e8;
+}
+
+.preview-word pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #333;
+  margin: 0;
+}
+
+.preview-pdf {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-other {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 16px;
+  color: #999;
+}
+
+.preview-other p {
+  margin: 0;
+}
+
+.preview-other .file-info {
+  font-size: 13px;
+  color: #666;
 }
 </style>

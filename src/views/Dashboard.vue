@@ -38,95 +38,20 @@
               </el-icon>
             </div>
             <div class="folder-tree-container">
-              <div v-for="folder in rootFolders" :key="folder.id">
-                <div 
-                  class="nav-item folder-item"
-                  :class="{ active: folderStore.currentFolder?.id === folder.id }"
-                  @click="handleFolderSelect(folder)"
-                  @contextmenu="handleFolderContextMenu($event, folder)"
-                >
-                  <el-icon class="nav-icon"><FolderOpened /></el-icon>
-                  <template v-if="editingFolderId === folder.id">
-                    <el-input 
-                      v-model="editingFolderName" 
-                      class="folder-edit-input"
-                      size="small"
-                      @blur="handleRenameConfirm(folder)"
-                      @keyup.enter="handleRenameConfirm(folder)"
-                      @keyup.esc="handleRenameCancel(folder)"
-                      ref="renameInputRef"
-                    />
-                  </template>
-                  <template v-else>
-                    <span class="nav-text" v-show="!sidebarCollapsed">{{ folder.name }}</span>
-                  </template>
-                  <el-tooltip v-if="sidebarCollapsed && editingFolderId !== folder.id" :content="folder.name" placement="right" effect="dark">
-                    <span class="tooltip-anchor"></span>
-                  </el-tooltip>
-                  <el-icon v-if="hasChildren(folder)" class="nav-arrow" :class="{ expanded: expandedFolders.includes(folder.id) }" v-show="!sidebarCollapsed" @click.stop="toggleFolderExpand(folder.id)">
-                    <ArrowRight />
-                  </el-icon>
-                </div>
-                <div v-if="expandedFolders.includes(folder.id)" class="sub-folders">
-                  <template v-for="subFolder in getChildren(folder)" :key="subFolder.id">
-                    <div 
-                      class="nav-item sub-folder-item"
-                      :class="{ active: folderStore.currentFolder?.id === subFolder.id }"
-                      @click="handleFolderSelect(subFolder)"
-                      @contextmenu="handleFolderContextMenu($event, subFolder)"
-                    >
-                      <el-icon class="nav-icon"><Folder /></el-icon>
-                      <template v-if="editingFolderId === subFolder.id">
-                        <el-input 
-                          v-model="editingFolderName" 
-                          class="folder-edit-input"
-                          size="small"
-                          @blur="handleRenameConfirm(subFolder)"
-                          @keyup.enter="handleRenameConfirm(subFolder)"
-                          @keyup.esc="handleRenameCancel(subFolder)"
-                        />
-                      </template>
-                      <template v-else>
-                        <span class="nav-text" v-show="!sidebarCollapsed">{{ subFolder.name }}</span>
-                      </template>
-                      <el-tooltip v-if="sidebarCollapsed && editingFolderId !== subFolder.id" :content="subFolder.name" placement="right" effect="dark">
-                        <span class="tooltip-anchor"></span>
-                      </el-tooltip>
-                      <el-icon v-if="hasChildren(subFolder)" class="nav-arrow" :class="{ expanded: expandedFolders.includes(subFolder.id) }" v-show="!sidebarCollapsed" @click.stop="toggleFolderExpand(subFolder.id)">
-                        <ArrowRight />
-                      </el-icon>
-                    </div>
-                    <div v-if="expandedFolders.includes(subFolder.id)" class="sub-folders">
-                      <template v-for="deepFolder in getChildren(subFolder)" :key="deepFolder.id">
-                        <div 
-                          class="nav-item deep-folder-item"
-                          :class="{ active: folderStore.currentFolder?.id === deepFolder.id }"
-                          @click="handleFolderSelect(deepFolder)"
-                          @contextmenu="handleFolderContextMenu($event, deepFolder)"
-                        >
-                          <el-icon class="nav-icon"><Folder /></el-icon>
-                          <template v-if="editingFolderId === deepFolder.id">
-                            <el-input 
-                              v-model="editingFolderName" 
-                              class="folder-edit-input"
-                              size="small"
-                              @blur="handleRenameConfirm(deepFolder)"
-                              @keyup.enter="handleRenameConfirm(deepFolder)"
-                              @keyup.esc="handleRenameCancel(deepFolder)"
-                            />
-                          </template>
-                          <template v-else>
-                            <span class="nav-text" v-show="!sidebarCollapsed">{{ deepFolder.name }}</span>
-                          </template>
-                          <el-tooltip v-if="sidebarCollapsed && editingFolderId !== deepFolder.id" :content="deepFolder.name" placement="right" effect="dark">
-                            <span class="tooltip-anchor"></span>
-                          </el-tooltip>
-                        </div>
-                      </template>
-                    </div>
-                  </template>
-                </div>
-              </div>
+              <RecursiveFolderItem
+                v-for="folder in rootFolders"
+                :key="folder.id"
+                :folder="folder"
+                :depth="1"
+                :sidebar-collapsed="sidebarCollapsed"
+                :editing-folder-id="editingFolderId"
+                :expanded-folders="expandedFolders"
+                :set-editing-folder-id="setEditingFolderId"
+                :on-rename-success="loadFolders"
+                @folder-select="handleFolderSelect"
+                @context-menu="handleFolderContextMenu"
+                @toggle-expand="toggleFolderExpand"
+              />
             </div>
           </div>
         </div>
@@ -266,11 +191,6 @@
             </div>
           </div>
           <div class="header-icons">
-            <el-tooltip content="搜索" placement="bottom">
-              <el-button class="icon-btn" @click="toggleSearch">
-                <el-icon><Search /></el-icon>
-              </el-button>
-            </el-tooltip>
             <el-tooltip content="通知" placement="bottom">
               <el-button class="icon-btn" @click="toggleNotification">
                 <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="notification-badge">
@@ -278,25 +198,6 @@
                 </el-badge>
               </el-button>
             </el-tooltip>
-            <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏'" placement="bottom">
-              <el-button class="icon-btn" @click="toggleFullscreen">
-                <el-icon><ZoomIn v-if="!isFullscreen" /><ZoomOut v-else /></el-icon>
-              </el-button>
-            </el-tooltip>
-            <el-dropdown @command="handleLanguageChange" trigger="click">
-              <span class="language-btn">
-                <svg viewBox="0 0 24 24" width="22" height="22">
-                  <text x="10" y="14" font-size="11" font-weight="bold" text-anchor="middle" fill="currentColor">文</text>
-                  <text x="14" y="19" font-size="9" font-weight="bold" text-anchor="middle" fill="currentColor">A</text>
-                </svg>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item :command="'zh'" :disabled="currentLanguage === '中文'">中文</el-dropdown-item>
-                  <el-dropdown-item :command="'en'" :disabled="currentLanguage === 'English'">English</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
           </div>
           <el-dropdown trigger="click" @command="handleUserCommand" class="user-dropdown">
             <div class="user-info" v-if="userInfo">
@@ -488,6 +389,7 @@ import { useFolderStore } from '@/stores/folder'
 import { folderAPI, tagAPI } from '@/api'
 import FolderTree from '@/components/FolderTree.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
+import RecursiveFolderItem from '@/components/RecursiveFolderItem.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -671,7 +573,10 @@ const formatBytes = (bytes) => {
 const quickSearch = ref('')
 const handleQuickSearch = () => {
   if (quickSearch.value.trim()) {
-    ElMessage.info(`搜索: ${quickSearch.value}`)
+    router.push({ 
+      path: '/dashboard', 
+      query: { keyword: quickSearch.value.trim() }
+    })
     quickSearch.value = ''
   }
 }
@@ -710,8 +615,10 @@ const contextMenuPosition = reactive({ x: 0, y: 0 })
 const contextMenuFolder = ref(null)
 
 const editingFolderId = ref(null)
-const editingFolderName = ref('')
-const renameInputRef = ref(null)
+
+const setEditingFolderId = (id) => {
+  editingFolderId.value = id
+}
 
 const handleFolderContextMenu = (event, folder) => {
   event.preventDefault()
@@ -734,11 +641,9 @@ const handleRenameFolder = (folder) => {
   })
 }
 
-const handleRenameConfirm = async (folder) => {
-  const newName = editingFolderName.value.trim()
+const handleRenameConfirm = async ({ folder, newName }) => {
   if (!newName) {
     ElMessage.warning('请输入文件夹名称')
-    editingFolderName.value = folder.name
     return
   }
   
@@ -750,7 +655,6 @@ const handleRenameConfirm = async (folder) => {
   const siblings = folderStore.folders.filter(f => f.parentId === folder.parentId && f.id !== folder.id)
   if (siblings.some(f => f.name === newName)) {
     ElMessage.warning('该名称已存在')
-    editingFolderName.value = folder.name
     return
   }
   
@@ -761,7 +665,6 @@ const handleRenameConfirm = async (folder) => {
     loadFolders()
   } catch (error) {
     ElMessage.error('重命名失败')
-    editingFolderName.value = folder.name
   }
 }
 
@@ -859,7 +762,7 @@ const handleFolderSelect = (folder) => {
 const loadTags = async () => {
   try {
     const res = await tagAPI.getTags()
-    tags.value = res.data?.content || res.data || []
+    tags.value = res.success ? (res.data || []) : []
   } catch (error) {
     console.error('加载标签失败:', error)
   }
@@ -938,8 +841,8 @@ watch(() => folderStore.folders, () => {
 onMounted(() => {
   loadFolders()
   loadTags()
-  storageUsed.value = userInfo.value.storage_used || 0
-  storageQuota.value = userInfo.value.storage_quota || 1073741824
+  storageUsed.value = userInfo.value.storageUsed || 0
+  storageQuota.value = userInfo.value.storageQuota || 1073741824
   document.addEventListener('click', closeContextMenu)
 })
 
@@ -950,7 +853,9 @@ onUnmounted(() => {
 const loadFolders = async () => {
   try {
     const res = await folderAPI.getFolders()
-    folderStore.setFolders(res.data || [])
+    const folders = res.success ? (res.data || []) : []
+    folderStore.setFolders(folders)
+    console.log('Loaded folders:', folders)
   } catch (error) {
     console.error('加载文件夹失败:', error)
   }
@@ -1047,14 +952,15 @@ const loadFolders = async () => {
   gap: 12px;
   padding: 12px 20px;
   cursor: pointer;
-  color: #666;
+  color: #333;
+  font-weight: 600;
   transition: all 0.2s ease;
   margin: 0;
+  background: #ffffff;
 }
 
 .nav-group-title:hover {
   background: #f5f7fa;
-  color: #409eff;
 }
 
 .nav-group-title.active {
@@ -1062,7 +968,7 @@ const loadFolders = async () => {
 }
 
 .nav-group-items {
-  background: #f8f9fa;
+  background: #fafafa;
 }
 
 .nav-item {
@@ -1078,12 +984,12 @@ const loadFolders = async () => {
 }
 
 .nav-item:hover {
-  background: #eef2f7;
+  background: #f0f5ff;
   color: #409eff;
 }
 
 .nav-item.active {
-  background: #eef2f7;
+  background: #ecf5ff;
   color: #409eff;
   font-weight: 500;
 }
@@ -1126,7 +1032,7 @@ const loadFolders = async () => {
 }
 
 .sub-folders {
-  background: #ffffff;
+  background: #1f2937;
   padding-left: 20px;
 }
 

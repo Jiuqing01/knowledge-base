@@ -6,6 +6,7 @@ import edu.ngd.dto.response.FolderResponse;
 import edu.ngd.entity.Folder;
 import edu.ngd.service.FolderService;
 import edu.ngd.service.JwtService;
+import edu.ngd.service.OperationLogService;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class FolderController {
 
     private final FolderService folderService;
     private final JwtService jwtService;
+    private final OperationLogService operationLogService;
 
     private Long getCurrentUserId(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -40,6 +42,10 @@ public class FolderController {
             HttpServletRequest httpRequest) {
         Long ownerId = getCurrentUserId(httpRequest);
         Folder folder = folderService.createFolder(ownerId, request.getName(), request.getParentId());
+        
+        operationLogService.log(ownerId, "创建文件夹", "folder", folder.getId(), 
+                "创建文件夹: " + request.getName());
+        
         return ResponseEntity.ok(ApiResponse.success("文件夹创建成功", FolderResponse.fromFolder(folder)));
     }
 
@@ -49,7 +55,13 @@ public class FolderController {
             @Valid @RequestBody FolderRequest request,
             HttpServletRequest httpRequest) {
         Long ownerId = getCurrentUserId(httpRequest);
-        Folder folder = folderService.updateFolder(id, ownerId, request.getName());
+        Folder folder = folderService.getFolder(id, ownerId);
+        String oldName = folder.getName();
+        folder = folderService.updateFolder(id, ownerId, request.getName());
+        
+        operationLogService.log(ownerId, "重命名文件夹", "folder", id, 
+                "文件夹重命名: " + oldName + " -> " + request.getName());
+        
         return ResponseEntity.ok(ApiResponse.success("文件夹更新成功", FolderResponse.fromFolder(folder)));
     }
 
@@ -58,7 +70,12 @@ public class FolderController {
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
         Long ownerId = getCurrentUserId(httpRequest);
+        Folder folder = folderService.getFolder(id, ownerId);
+        String folderName = folder.getName();
         folderService.deleteFolder(id, ownerId);
+        
+        operationLogService.log(ownerId, "删除文件夹", "folder", id, "删除文件夹: " + folderName);
+        
         return ResponseEntity.ok(ApiResponse.success("文件夹删除成功"));
     }
 

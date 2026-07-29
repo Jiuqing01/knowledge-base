@@ -19,7 +19,7 @@ spring:
 
 jwt:
   secret: knowledge-base-management-system-secret-key-2024
-  access-token-expire-minutes: 30
+  access-token-expire-minutes: 1440
   refresh-token-expire-days: 7
 
 app:

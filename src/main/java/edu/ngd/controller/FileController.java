@@ -7,8 +7,10 @@ import edu.ngd.dto.response.FileResponse;
 import edu.ngd.dto.response.TagResponse;
 import edu.ngd.entity.File;
 import edu.ngd.entity.Tag;
+import edu.ngd.repository.FileRepository;
 import edu.ngd.service.FileService;
 import edu.ngd.service.JwtService;
+import edu.ngd.service.OperationLogService;
 import edu.ngd.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,14 +45,48 @@ public class FileController {
     private final FileService fileService;
     private final JwtService jwtService;
     private final TagService tagService;
+    private final OperationLogService operationLogService;
+    private final FileRepository fileRepository;
 
     private Long getCurrentUserId(HttpServletRequest request) {
+        String token = null;
+        
         String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else {
+            String tokenParam = request.getParameter("token");
+            if (tokenParam != null && !tokenParam.isEmpty()) {
+                token = tokenParam;
+            }
+        }
+        
+        if (token == null) {
             throw new RuntimeException("用户未登录");
         }
-        String token = authHeader.substring(7);
+        
         return jwtService.getUserIdFromToken(token);
+    }
+    
+    private boolean isAdmin(HttpServletRequest request) {
+        String token = null;
+        
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else {
+            String tokenParam = request.getParameter("token");
+            if (tokenParam != null && !tokenParam.isEmpty()) {
+                token = tokenParam;
+            }
+        }
+        
+        if (token == null) {
+            return false;
+        }
+        
+        String role = jwtService.getRoleFromToken(token);
+        return "ADMIN".equals(role);
     }
 
     @PostMapping("/upload")
@@ -60,6 +96,10 @@ public class FileController {
             HttpServletRequest request) throws IOException {
         Long ownerId = getCurrentUserId(request);
         File uploadedFile = fileService.uploadFile(ownerId, file, folderId);
+        
+        operationLogService.log(ownerId, "上传文件", "file", uploadedFile.getId(), 
+                "上传文件: " + file.getOriginalFilename());
+        
         return ResponseEntity.ok(ApiResponse.success("文件上传成功", FileResponse.fromFile(uploadedFile)));
     }
 
@@ -76,7 +116,12 @@ public class FileController {
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteFile(@PathVariable Long id, HttpServletRequest request) {
         Long ownerId = getCurrentUserId(request);
+        File file = fileService.getFile(id, ownerId);
+        String fileName = file.getOriginalName();
         fileService.deleteFile(id, ownerId);
+        
+        operationLogService.log(ownerId, "删除文件", "file", id, "删除文件: " + fileName);
+        
         return ResponseEntity.ok(ApiResponse.success("文件删除成功"));
     }
 
@@ -211,7 +256,13 @@ public class FileController {
             @RequestBody UpdateFileRequest request,
             HttpServletRequest httpRequest) {
         Long ownerId = getCurrentUserId(httpRequest);
-        File file = fileService.updateFile(id, ownerId, request.getName(), null);
+        File file = fileService.getFile(id, ownerId);
+        String oldName = file.getOriginalName();
+        file = fileService.updateFile(id, ownerId, request.getName(), null);
+        
+        operationLogService.log(ownerId, "重命名文件", "file", id, 
+                "文件重命名: " + oldName + " -> " + request.getName());
+        
         return ResponseEntity.ok(ApiResponse.success("文件重命名成功", FileResponse.fromFile(file)));
     }
 
@@ -238,11 +289,14 @@ public class FileController {
     @GetMapping("/download/{id}")
     public ResponseEntity<Resource> downloadFile(@PathVariable Long id, HttpServletRequest request) {
         Long ownerId = getCurrentUserId(request);
-        log.info("downloadFile called with id={}, ownerId={}", id, ownerId);
+        boolean admin = isAdmin(request);
+        log.info("downloadFile called with id={}, ownerId={}, admin={}", id, ownerId, admin);
         
-        File file = fileService.getFile(id, ownerId);
-        if (file == null) {
-            throw new RuntimeException("文件不存在");
+        File file;
+        if (admin) {
+            file = fileRepository.findById(id).orElseThrow(() -> new RuntimeException("文件不存在"));
+        } else {
+            file = fileService.getFile(id, ownerId);
         }
         
         String storagePath = file.getStoragePath();
@@ -274,6 +328,61 @@ public class FileController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + filename)
                 .body(resource);
+    }
+
+    @GetMapping("/preview/{id}")
+    public ResponseEntity<Resource> previewFile(@PathVariable Long id, HttpServletRequest request) {
+        Long ownerId = getCurrentUserId(request);
+        boolean admin = isAdmin(request);
+        log.info("previewFile called with id={}, ownerId={}, admin={}", id, ownerId, admin);
+        
+        File file;
+        if (admin) {
+            file = fileRepository.findById(id).orElseThrow(() -> new RuntimeException("文件不存在"));
+        } else {
+            file = fileService.getFile(id, ownerId);
+        }
+        
+        String storagePath = file.getStoragePath();
+        log.info("File storage path: {}", storagePath);
+        
+        if (storagePath == null || storagePath.isEmpty()) {
+            throw new RuntimeException("文件存储路径为空");
+        }
+        
+        Path filePath = Paths.get(storagePath);
+        log.info("Resolved file path: {}", filePath.toAbsolutePath());
+        
+        Resource resource = new FileSystemResource(filePath);
+        log.info("Resource exists: {}", resource.exists());
+
+        if (!resource.exists()) {
+            throw new RuntimeException("文件已被删除或不存在");
+        }
+
+        String mimeType = file.getMimeType();
+        if (mimeType == null || mimeType.isEmpty()) {
+            mimeType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+
+        try {
+                String encodedFilename = java.net.URLEncoder.encode(file.getOriginalName(), "UTF-8")
+                        .replace("+", "%20");
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(mimeType))
+                        .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                        .header(HttpHeaders.PRAGMA, "no-cache")
+                        .header(HttpHeaders.EXPIRES, "0")
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + encodedFilename + "\"; filename*=UTF-8''" + encodedFilename)
+                        .body(resource);
+            } catch (java.io.UnsupportedEncodingException e) {
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(mimeType))
+                        .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                        .header(HttpHeaders.PRAGMA, "no-cache")
+                        .header(HttpHeaders.EXPIRES, "0")
+                        .body(resource);
+            }
     }
 
     @PostMapping("/download/batch")

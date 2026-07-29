@@ -205,6 +205,12 @@ export const fileAPI = {
     return instance.get(`/files/download/${id}`, { responseType: 'blob' })
   },
 
+  previewFile: async (id) => {
+    const token = localStorage.getItem('accessToken')
+    console.log('Previewing file:', id, 'Token:', token ? token.substring(0, 20) + '...' : 'null')
+    return instance.get(`/files/preview/${id}`, { responseType: 'blob' })
+  },
+
   downloadBatch: async (ids) => {
     return instance.post('/files/download/batch', ids, { responseType: 'blob' })
   },

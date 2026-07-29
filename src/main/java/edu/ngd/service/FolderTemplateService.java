@@ -22,12 +22,16 @@ public class FolderTemplateService {
     @Transactional
     public void createFoldersForUser(Long userId) {
         List<FolderTemplate> rootTemplates = folderTemplateRepository.findByParentIdIsNullOrderBySortOrder();
+        log.info("createFoldersForUser called for userId={}, found {} root templates", userId, rootTemplates.size());
         
         for (FolderTemplate template : rootTemplates) {
+            log.info("Processing root template: id={}, name={}", template.getId(), template.getName());
             createFolderFromTemplate(template, userId, null);
         }
         
-        log.info("Created folders for user: {}", userId);
+        List<Folder> createdFolders = folderRepository.findByOwnerIdAndIsDeleted(userId, 0);
+        log.info("Created {} folders for user {}: {}", createdFolders.size(), userId, 
+                createdFolders.stream().map(f -> f.getName()).collect(java.util.stream.Collectors.toList()));
     }
 
     private void createFolderFromTemplate(FolderTemplate template, Long userId, Long parentFolderId) {
@@ -35,6 +39,7 @@ public class FolderTemplateService {
                 .name(template.getName())
                 .parentId(parentFolderId)
                 .ownerId(userId)
+                .isDeleted(0)
                 .build();
         
         Folder savedFolder = folderRepository.save(folder);
