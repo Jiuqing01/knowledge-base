@@ -191,12 +191,14 @@
       </template>
     </el-dialog>
     
-    <el-dialog v-model="addTagVisible" title="添加标签" width="400px">
+    <el-dialog v-model="addTagVisible" title="添加标签" width="400px" :close-on-click-modal="false">
       <el-select
         v-model="selectedTagIds"
         multiple
         placeholder="选择标签"
         class="w-full"
+        :teleported="false"
+        @visible-change="handleTagSelectVisibleChange"
       >
         <el-option
           v-for="tag in availableTags"
@@ -642,6 +644,12 @@ const showAddTagDialog = async (file) => {
   }
   
   addTagVisible.value = true
+}
+
+const handleTagSelectVisibleChange = (visible) => {
+  if (!visible && selectedTagIds.value.length > 0) {
+    // dropdown closed, tags are already committed via v-model
+  }
 }
 
 const handleAddTags = async () => {

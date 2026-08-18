@@ -1,19 +1,18 @@
 package edu.ngd.service;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VerificationCodeService {
 
     private final StringRedisTemplate redisTemplate;
+    private final SmsService smsService;
     private static final String CODE_PREFIX = "verification_code:";
     private static final int CODE_LENGTH = 6;
     private static final int EXPIRATION_MINUTES = 5;
@@ -24,7 +23,7 @@ public class VerificationCodeService {
         
         redisTemplate.opsForValue().set(key, code, EXPIRATION_MINUTES, TimeUnit.MINUTES);
         
-        log.info("Verification code sent to phone: {}, code: {}", phone, code);
+        smsService.sendVerificationCode(phone, code);
     }
 
     public boolean verifyCode(String phone, String code) {

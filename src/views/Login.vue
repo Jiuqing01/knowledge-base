@@ -103,33 +103,6 @@
           </el-form-item>
         </el-form>
         
-        <div class="social-login">
-          <div class="social-divider">
-            <span class="divider-line"></span>
-            <span class="divider-text">其他账号登录</span>
-            <span class="divider-line"></span>
-          </div>
-          <div class="social-buttons">
-            <el-button class="social-btn social-btn-wecom" @click="handleWecomLogin">
-              <svg class="social-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8.5 2H15.5C16.8807 2 18 3.11929 18 4.5V19.5C18 20.8807 16.8807 22 15.5 22H8.5C7.11929 22 6 20.8807 6 19.5V4.5C6 3.11929 7.11929 2 8.5 2Z" fill="#07C160"/>
-                <path d="M10 9.5C9.17157 9.5 8.5 10.1716 8.5 11V13C8.5 13.8284 9.17157 14.5 10 14.5C10.8284 14.5 11.5 13.8284 11.5 13V11C11.5 10.1716 10.8284 9.5 10 9.5Z" fill="white"/>
-                <path d="M13.5 9.5C12.6716 9.5 12 10.1716 12 11V13C12 13.8284 12.6716 14.5 13.5 14.5C14.3284 14.5 15 13.8284 15 13V11C15 10.1716 14.3284 9.5 13.5 9.5Z" fill="white"/>
-                <path d="M17 9.5C16.1716 9.5 15.5 10.1716 15.5 11V13C15.5 13.8284 16.1716 14.5 17 14.5C17.8284 14.5 18.5 13.8284 18.5 13V11C18.5 10.1716 17.8284 9.5 17 9.5Z" fill="white"/>
-              </svg>
-              <span>企业微信</span>
-            </el-button>
-            <el-button class="social-btn social-btn-qq" @click="handleQqLogin">
-              <svg class="social-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" fill="#12B7F5"/>
-                <path d="M8.5 15.5C8.5 15.5 6.5 14 6.5 11.5C6.5 9 8.5 7.5 8.5 7.5C8.5 7.5 10.5 9 10.5 11.5C10.5 14 8.5 15.5 8.5 15.5Z" fill="white"/>
-                <path d="M15.5 15.5C15.5 15.5 13.5 14 13.5 11.5C13.5 9 15.5 7.5 15.5 7.5C15.5 7.5 17.5 9 17.5 11.5C17.5 14 15.5 15.5 15.5 15.5Z" fill="white"/>
-              </svg>
-              <span>QQ</span>
-            </el-button>
-          </div>
-        </div>
-        
         <div class="login-footer">
           <span>您还没有账户？</span>
           <router-link to="/register" class="register-link">注册</router-link>
@@ -226,14 +199,6 @@ const handleLogin = async () => {
     ElMessage.error(result.message)
     refreshCaptcha()
   }
-}
-
-const handleWecomLogin = () => {
-  ElMessage.info('企业微信登录功能开发中')
-}
-
-const handleQqLogin = () => {
-  ElMessage.info('QQ登录功能开发中')
 }
 
 onMounted(() => {
@@ -668,59 +633,6 @@ onMounted(() => {
 
 .login-btn:hover {
   background: #1557b0;
-}
-
-.social-login {
-  margin-bottom: 24px;
-}
-
-.social-divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.divider-line {
-  flex: 1;
-  height: 1px;
-  background: #e8e8e8;
-}
-
-.divider-text {
-  font-size: 13px;
-  color: #999;
-}
-
-.social-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.social-btn {
-  flex: 1;
-  height: 40px;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #666;
-  transition: all 0.3s;
-}
-
-.social-btn:hover {
-  border-color: #dcdfe6;
-  background: #f5f7fa;
-}
-
-.social-icon {
-  width: 18px;
-  height: 18px;
 }
 
 .login-footer {

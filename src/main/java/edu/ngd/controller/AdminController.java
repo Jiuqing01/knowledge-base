@@ -7,6 +7,7 @@ import edu.ngd.entity.UserRole;
 import edu.ngd.repository.FileRepository;
 import edu.ngd.repository.FolderRepository;
 import edu.ngd.repository.UserRepository;
+import edu.ngd.service.FolderTemplateService;
 import edu.ngd.service.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class AdminController {
     private final FileRepository fileRepository;
     private final FolderRepository folderRepository;
     private final SystemConfigService systemConfigService;
+    private final FolderTemplateService folderTemplateService;
     private final BCryptPasswordEncoder passwordEncoder;
 
     @GetMapping("/users")
@@ -155,12 +157,17 @@ public class AdminController {
         Map<String, Object> config = new HashMap<>();
         
         SystemConfig fileExtensions = systemConfigService.getConfig("allowed_file_extensions");
-        SystemConfig maxFileSize = systemConfigService.getConfig("max_file_size");
-        SystemConfig defaultQuota = systemConfigService.getConfig("default_storage_quota");
+        if (fileExtensions == null) {
+            fileExtensions = new SystemConfig();
+            fileExtensions.setConfigKey("allowed_file_extensions");
+            fileExtensions.setConfigValue(".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.png,.zip,.txt,.md");
+        }
+        String maxFileSizeValue = systemConfigService.getConfigValue("max_file_size", "524288000");
+        String defaultQuotaValue = systemConfigService.getConfigValue("default_storage_quota", "1073741824");
         
         config.put("allowed_file_extensions", fileExtensions);
-        config.put("max_file_size", maxFileSize);
-        config.put("default_storage_quota", defaultQuota);
+        config.put("max_file_size", maxFileSizeValue != null ? maxFileSizeValue : "524288000");
+        config.put("default_storage_quota", defaultQuotaValue != null ? defaultQuotaValue : "1073741824");
         
         return ResponseEntity.ok(ApiResponse.success(config));
     }
@@ -196,13 +203,16 @@ public class AdminController {
     }
 
     @GetMapping("/folder-templates")
-    public ResponseEntity<ApiResponse<SystemConfig>> getFolderTemplates() {
-        SystemConfig templates = systemConfigService.getConfig("folder_templates");
-        return ResponseEntity.ok(ApiResponse.success(templates));
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getFolderTemplates() {
+        String text = folderTemplateService.getTemplatesAsText();
+        Map<String, Object> result = new HashMap<>();
+        result.put("configKey", "folder_templates");
+        result.put("configValue", text);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     @PutMapping("/folder-templates")
-    public ResponseEntity<ApiResponse<SystemConfig>> updateFolderTemplates(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateFolderTemplates(
             @RequestBody Map<String, String> request) {
         
         String templates = request.get("templates");
@@ -210,14 +220,20 @@ public class AdminController {
             throw new RuntimeException("模板内容不能为空");
         }
         
-        SystemConfig config = systemConfigService.updateConfig(
+        folderTemplateService.saveTemplatesFromText(templates);
+
+        // 同步保存一份到 system_configs 用于审计/备份
+        systemConfigService.updateConfig(
                 "folder_templates",
                 templates,
                 "新用户初始文件夹模板，支持树形结构，格式如：文档/工作/报告,文档/个人/笔记"
         );
         
+        Map<String, Object> result = new HashMap<>();
+        result.put("configKey", "folder_templates");
+        result.put("configValue", templates);
         log.info("Admin updated folder templates");
-        return ResponseEntity.ok(ApiResponse.success("文件夹模板更新成功", config));
+        return ResponseEntity.ok(ApiResponse.success("文件夹模板更新成功", result));
     }
 
     @GetMapping("/files")

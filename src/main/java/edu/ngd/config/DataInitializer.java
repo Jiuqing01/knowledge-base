@@ -1,9 +1,11 @@
 package edu.ngd.config;
 
 import edu.ngd.entity.FolderTemplate;
+import edu.ngd.entity.Tag;
 import edu.ngd.entity.User;
 import edu.ngd.entity.UserRole;
 import edu.ngd.repository.FolderTemplateRepository;
+import edu.ngd.repository.TagRepository;
 import edu.ngd.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final FolderTemplateRepository folderTemplateRepository;
+    private final TagRepository tagRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
     @Override
@@ -28,6 +31,7 @@ public class DataInitializer implements CommandLineRunner {
         initAdminUser();
         initTestUser();
         initFolderTemplates();
+        initDefaultTags();
     }
 
     private void initAdminUser() {
@@ -110,5 +114,30 @@ public class DataInitializer implements CommandLineRunner {
         folderTemplateRepository.save(FolderTemplate.builder().name("知识库").parentId(shared.getId()).sortOrder(2).build());
 
         log.info("Default folder templates initialized");
+    }
+
+    private void initDefaultTags() {
+        List<User> users = userRepository.findAll();
+        for (User user : users) {
+            createTagIfMissing(user.getId(), "重要", "#F56C6C");
+            createTagIfMissing(user.getId(), "工作", "#409EFF");
+            createTagIfMissing(user.getId(), "学习", "#67C23A");
+            createTagIfMissing(user.getId(), "项目", "#E6A23C");
+            createTagIfMissing(user.getId(), "待办", "#909399");
+            createTagIfMissing(user.getId(), "归档", "#B37FEB");
+        }
+        log.info("Default tags initialized for all users");
+    }
+
+    private void createTagIfMissing(Long ownerId, String name, String color) {
+        if (tagRepository.existsByNameAndOwnerId(name, ownerId)) {
+            return;
+        }
+        Tag tag = Tag.builder()
+                .name(name)
+                .ownerId(ownerId)
+                .color(color)
+                .build();
+        tagRepository.save(tag);
     }
 }

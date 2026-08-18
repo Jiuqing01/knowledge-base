@@ -386,7 +386,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useFolderStore } from '@/stores/folder'
-import { folderAPI, tagAPI } from '@/api'
+import { folderAPI, tagAPI, authAPI } from '@/api'
 import FolderTree from '@/components/FolderTree.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
 import RecursiveFolderItem from '@/components/RecursiveFolderItem.vue'
@@ -567,6 +567,29 @@ const formatBytes = (bytes) => {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// 从后端获取最新用户信息
+const fetchUserInfo = async () => {
+  try {
+    const userId = userInfo.value?.id
+    if (userId) {
+      const res = await authAPI.getCurrentUser(userId)
+      if (res.success && res.data) {
+        userStore.userInfo = res.data
+        localStorage.setItem('userInfo', JSON.stringify(res.data))
+        storageUsed.value = res.data.storageUsed || 0
+        storageQuota.value = res.data.storageQuota || 1073741824
+      }
+    } else {
+      storageUsed.value = userInfo.value?.storageUsed || 0
+      storageQuota.value = userInfo.value?.storageQuota || 1073741824
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    storageUsed.value = userInfo.value?.storageUsed || 0
+    storageQuota.value = userInfo.value?.storageQuota || 1073741824
+  }
 }
 
 // 快速搜索
@@ -838,11 +861,10 @@ watch(() => folderStore.folders, () => {
   }
 }, { deep: true })
 
-onMounted(() => {
+onMounted(async () => {
   loadFolders()
   loadTags()
-  storageUsed.value = userInfo.value.storageUsed || 0
-  storageQuota.value = userInfo.value.storageQuota || 1073741824
+  await fetchUserInfo()
   document.addEventListener('click', closeContextMenu)
 })
 

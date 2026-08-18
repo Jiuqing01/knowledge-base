@@ -17,8 +17,7 @@ public class SystemConfigService {
     private final SystemConfigRepository systemConfigRepository;
 
     public SystemConfig getConfig(String key) {
-        return systemConfigRepository.findByConfigKey(key)
-                .orElseThrow(() -> new RuntimeException("配置不存在"));
+        return systemConfigRepository.findByConfigKey(key).orElse(null);
     }
 
     public String getConfigValue(String key) {

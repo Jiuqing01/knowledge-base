@@ -29,6 +29,9 @@ public class SystemConfigController {
     @GetMapping("/{key}")
     public ResponseEntity<ApiResponse<SystemConfig>> getConfigByKey(@PathVariable String key) {
         SystemConfig config = systemConfigService.getConfig(key);
+        if (config == null) {
+            return ResponseEntity.ok(ApiResponse.error(404, "配置不存在"));
+        }
         return ResponseEntity.ok(ApiResponse.success(config));
     }
 

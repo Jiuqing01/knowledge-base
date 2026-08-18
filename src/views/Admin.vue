@@ -97,24 +97,27 @@
               <p class="config-desc">超级管理员可配置允许上传的文件扩展名（严格模式，仅白名单内的扩展名允许上传）</p>
             </div>
             
-            <el-form :model="whitelistForm" label-width="150px" class="config-form">
-              <el-form-item label="允许的扩展名">
+            <div class="whitelist-layout">
+              <div class="whitelist-left">
+                <div class="template-label">允许的扩展名</div>
                 <el-input
                   v-model="whitelistForm.extensions"
                   type="textarea"
-                  :rows="4"
-                  placeholder="请输入允许的文件扩展名，用逗号分隔，例如：.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.png,.zip,.txt,.md"
+                  :rows="8"
+                  placeholder="请输入允许的文件扩展名，用逗号分隔"
                 />
-                <div class="form-tip">扩展名校验不区分大小写，统一转为小写后比对</div>
-              </el-form-item>
-              <el-form-item label="示例">
-                <div class="example-box">.pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .jpg, .png, .zip, .txt, .md</div>
-              </el-form-item>
-            </el-form>
+                <div class="form-tip">💡 扩展名校验不区分大小写，统一转为小写后比对</div>
+              </div>
+              
+              <div class="whitelist-right">
+                <div class="template-label">示例</div>
+                <div class="preview-example">.pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .jpg, .png, .zip, .txt, .md</div>
+              </div>
+            </div>
             
             <div class="config-actions">
               <el-button type="primary" @click="handleSaveWhitelist">保存配置</el-button>
-              <el-button @click="loadWhitelist">重置</el-button>
+              <el-button @click="resetWhitelist">重置</el-button>
             </div>
           </div>
         </div>
@@ -129,87 +132,46 @@
               <p class="config-desc">模板修改仅影响新注册用户，已有用户不受影响</p>
             </div>
             
-            <el-form :model="templateForm" label-width="150px" class="config-form">
-              <el-form-item label="文件夹模板">
+            <div class="template-layout">
+              <div class="template-left">
+                <div class="template-label">文件夹模板</div>
                 <el-input
                   v-model="templateForm.templates"
                   type="textarea"
-                  :rows="6"
-                  placeholder="请输入文件夹模板，每行一个路径，支持树形结构，例如：&#10;文档/工作/报告&#10;文档/个人/笔记&#10;资源/图片&#10;资源/模板"
+                  :rows="12"
+                  placeholder="每行一个路径，使用斜杠(/)表示层级关系，例如：&#10;文档/工作/报告&#10;文档/个人/笔记&#10;资源/图片&#10;资源/模板"
                 />
-                <div class="form-tip">使用斜杠(/)表示层级关系，每行一个完整路径</div>
-              </el-form-item>
-              <el-form-item label="当前模板预览">
-                <el-tree
-                  :data="templateTree"
-                  :props="{ label: 'name', children: 'children' }"
-                  default-expand-all
-                  class="template-tree"
-                />
-              </el-form-item>
-            </el-form>
+                <div class="form-tip">💡 使用斜杠(/)表示层级关系，每行一个完整路径</div>
+              </div>
+              
+              <div class="template-right">
+                <div class="template-label">模板预览</div>
+                <div class="template-preview-box">
+                  <el-tree
+                    :data="templateTree"
+                    :props="{ label: 'name', children: 'children' }"
+                    default-expand-all
+                    class="template-tree"
+                  >
+                    <template #default="{ node, data }">
+                      <span class="custom-tree-node">
+                        <el-icon><Folder /></el-icon>
+                        <span>{{ node.label }}</span>
+                      </span>
+                    </template>
+                  </el-tree>
+                </div>
+              </div>
+            </div>
             
             <div class="config-actions">
               <el-button type="primary" @click="handleSaveTemplates">保存模板</el-button>
-              <el-button @click="loadTemplates">重置</el-button>
+              <el-button @click="resetTemplates">重置</el-button>
             </div>
           </div>
         </div>
       </el-tab-pane>
       
-      <el-tab-pane label="部门管理" name="departments">
-        <div class="tab-content">
-          <div class="department-page">
-            <div class="department-sidebar">
-              <div class="sidebar-header">
-                <span class="sidebar-title">部门列表</span>
-                <div class="sidebar-actions">
-                  <el-button size="small" icon="Plus" @click="handleAddDept">新增</el-button>
-                  <el-button size="small" icon="Refresh" @click="loadDepartments">刷新</el-button>
-                </div>
-              </div>
-              <div class="search-box">
-                <el-input
-                  v-model="deptSearch"
-                  placeholder="部门列表关键词搜索"
-                  clearable
-                  size="small"
-                  @input="filterDepartment"
-                />
-              </div>
-              <el-tree
-                ref="deptTreeRef"
-                :data="departmentTree"
-                :props="defaultProps"
-                default-expand-all
-                highlight-current
-                draggable
-                :expand-on-click-node="false"
-                allow-drop="allowDrop"
-                allow-drag="allowDrag"
-                @node-drop="handleDeptDrop"
-                @node-click="handleDepartmentClick"
-              >
-                <template #default="{ node, data }">
-                  <div class="tree-node">
-                    <span>{{ data.label }}</span>
-                    <div class="node-actions">
-                      <el-button type="primary" link size="small" @click.stop="handleEditDept(node, data)">编辑</el-button>
-                      <el-button type="danger" link size="small" @click.stop="handleDeleteDept(node, data)">删除</el-button>
-                    </div>
-                  </div>
-                </template>
-              </el-tree>
-            </div>
-            
-            <div class="department-content">
-              <div class="empty-hint">
-                <el-alert title="选择左侧部门查看详情" type="info" :closable="false" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </el-tab-pane>
     </el-tabs>
     
     <el-dialog v-model="quotaVisible" title="调整存储配额" width="400px" draggable>
@@ -285,198 +247,16 @@
         <el-button type="primary" @click="handleConfirmEditUser">确认修改</el-button>
       </template>
     </el-dialog>
-    
-    <el-dialog v-model="deptDialogVisible" :title="isEditDept ? '编辑部门' : '新增部门'" width="400px" draggable>
-      <el-form :model="deptForm" label-width="100px">
-        <el-form-item label="部门名称">
-          <el-input v-model="deptForm.name" placeholder="请输入部门名称" />
-        </el-form-item>
-        <el-form-item label="上级部门">
-          <el-select v-model="deptForm.parentId" placeholder="请选择上级部门（可选）">
-            <el-option label="（无）" :value="0" />
-            <el-option
-              v-for="dept in flatDepartments"
-              :key="dept.id"
-              :label="dept.label"
-              :value="dept.id"
-              :disabled="isEditDept && dept.id === editingDeptId"
-            />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="deptDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSaveDept">确认</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Plus, Delete } from '@element-plus/icons-vue'
+import { Refresh, Plus, Delete, Folder } from '@element-plus/icons-vue'
 import { adminAPI } from '@/api'
 
 const activeTab = ref('users')
-
-const deptTreeRef = ref(null)
-const deptSearch = ref('')
-const departmentTree = ref([])
-
-const defaultProps = {
-  children: 'children',
-  label: 'label'
-}
-
-const flatDepartments = computed(() => {
-  const result = []
-  const flatten = (nodes) => {
-    for (const node of nodes) {
-      result.push(node)
-      if (node.children) flatten(node.children)
-    }
-  }
-  flatten(departmentTree.value)
-  return result
-})
-
-const filterDepartment = (value, data) => {
-  if (!value) return true
-  return data.label.includes(value)
-}
-
-const deptDialogVisible = ref(false)
-const isEditDept = ref(false)
-const editingDeptId = ref(null)
-const deptForm = reactive({
-  name: '',
-  parentId: 0
-})
-
-const loadDepartments = async () => {
-  try {
-    const res = await adminAPI.getDepartments()
-    departmentTree.value = res.data ? buildDeptTree(res.data) : []
-  } catch (error) {
-    console.error('加载部门失败:', error)
-    departmentTree.value = []
-  }
-}
-
-const buildDeptTree = (items, parentId = null) => {
-  return items
-    .filter(item => item.parentId === parentId)
-    .map(item => ({
-      id: item.id,
-      label: item.name,
-      children: buildDeptTree(items, item.id)
-    }))
-}
-
-const handleAddDept = () => {
-  isEditDept.value = false
-  editingDeptId.value = null
-  deptForm.name = ''
-  deptForm.parentId = 0
-  deptDialogVisible.value = true
-}
-
-const handleEditDept = (node, data) => {
-  isEditDept.value = true
-  editingDeptId.value = data.id
-  deptForm.name = data.label
-  deptForm.parentId = node.parent?.data?.id || 0
-  deptDialogVisible.value = true
-}
-
-const handleDeleteDept = async (node, data) => {
-  if (data.children && data.children.length > 0) {
-    ElMessage.warning('请先删除子部门')
-    return
-  }
-  
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除部门 "${data.label}" 吗？`,
-      '删除部门',
-      { type: 'error' }
-    )
-    
-    await adminAPI.deleteDepartment(data.id)
-    ElMessage.success('部门已删除')
-    loadDepartments()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
-  }
-}
-
-const handleSaveDept = async () => {
-  if (!deptForm.name.trim()) {
-    ElMessage.warning('请输入部门名称')
-    return
-  }
-  
-  const parentId = deptForm.parentId === 0 ? null : deptForm.parentId
-  
-  try {
-    if (isEditDept.value) {
-      await adminAPI.updateDepartment(editingDeptId.value, {
-        name: deptForm.name,
-        parentId: parentId
-      })
-      ElMessage.success('部门编辑成功')
-    } else {
-      await adminAPI.createDepartment({
-        name: deptForm.name,
-        parentId: parentId
-      })
-      ElMessage.success('部门添加成功')
-    }
-    deptDialogVisible.value = false
-    loadDepartments()
-  } catch (error) {
-    ElMessage.error(isEditDept.value ? '编辑失败' : '添加失败')
-  }
-}
-
-const allowDrop = (draggingNode, dropNode, type) => {
-  if (type === 'inner') {
-    return true
-  }
-  return false
-}
-
-const allowDrag = (draggingNode) => {
-  return true
-}
-
-const handleDeptDrop = async (draggingNode, dropNode, dropType) => {
-  const draggingData = draggingNode.data
-  const dropData = dropNode.data
-  
-  let newParentId = null
-  if (dropType === 'inner') {
-    newParentId = dropData.id
-  }
-  
-  try {
-    await adminAPI.updateDepartment(draggingData.id, {
-      parentId: newParentId
-    })
-    ElMessage.success('部门调整成功')
-    loadDepartments()
-  } catch (error) {
-    ElMessage.error('调整失败')
-    loadDepartments()
-  }
-}
-
-const handleDepartmentClick = (data) => {
-  console.log('部门点击:', data)
-}
 
 const selectedUsers = ref([])
 
@@ -681,13 +461,32 @@ const whitelistForm = reactive({
   extensions: ''
 })
 
+const originalWhitelist = ref('')
+const originalTemplates = ref('')
+
+const DEFAULT_TEMPLATES = `文档/工作/报告
+文档/个人/笔记
+资源/图片
+资源/模板`
+
+const DEFAULT_WHITELIST = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.png,.zip,.txt,.md'
+
 const loadWhitelist = async () => {
   try {
     const res = await adminAPI.getConfig()
-    whitelistForm.extensions = res.success ? (res.data?.allowed_file_extensions?.configValue || '') : ''
+    const value = res.success ? (res.data?.allowed_file_extensions?.configValue || DEFAULT_WHITELIST) : DEFAULT_WHITELIST
+    whitelistForm.extensions = value
+    originalWhitelist.value = value
   } catch (error) {
     console.error('加载配置失败:', error)
+    whitelistForm.extensions = DEFAULT_WHITELIST
+    originalWhitelist.value = DEFAULT_WHITELIST
   }
+}
+
+const resetWhitelist = () => {
+  whitelistForm.extensions = originalWhitelist.value
+  ElMessage.info('已重置为已保存的配置')
 }
 
 const handleSaveWhitelist = async () => {
@@ -700,6 +499,7 @@ const handleSaveWhitelist = async () => {
     await adminAPI.updateConfig({
       allowed_file_extensions: whitelistForm.extensions.trim()
     })
+    originalWhitelist.value = whitelistForm.extensions
     ElMessage.success('配置保存成功')
   } catch (error) {
     ElMessage.error('保存失败')
@@ -738,10 +538,19 @@ const templateTree = computed(() => {
 const loadTemplates = async () => {
   try {
     const res = await adminAPI.getFolderTemplates()
-    templateForm.templates = res.success ? (res.data?.configValue || '') : ''
+    const value = res.success ? (res.data?.configValue || DEFAULT_TEMPLATES) : DEFAULT_TEMPLATES
+    templateForm.templates = value
+    originalTemplates.value = value
   } catch (error) {
     console.error('加载模板失败:', error)
+    templateForm.templates = DEFAULT_TEMPLATES
+    originalTemplates.value = DEFAULT_TEMPLATES
   }
+}
+
+const resetTemplates = () => {
+  templateForm.templates = originalTemplates.value
+  ElMessage.info('已重置为已保存的模板')
 }
 
 const handleSaveTemplates = async () => {
@@ -754,6 +563,7 @@ const handleSaveTemplates = async () => {
     await adminAPI.updateFolderTemplates({
       templates: templateForm.templates.trim()
     })
+    originalTemplates.value = templateForm.templates
     ElMessage.success('模板保存成功')
   } catch (error) {
     ElMessage.error('保存失败')
@@ -787,8 +597,6 @@ const handleTabChange = (tab) => {
     loadWhitelist()
   } else if (tab === 'templates') {
     loadTemplates()
-  } else if (tab === 'departments') {
-    loadDepartments()
   }
 }
 
@@ -922,27 +730,11 @@ onMounted(() => {
   line-height: 1.6;
 }
 
-.config-form {
-  background: #fafafa;
-  padding: 24px;
-  border-radius: 10px;
-}
-
 .form-tip {
   font-size: 13px;
   color: #909399;
   margin-top: 10px;
   line-height: 1.5;
-}
-
-.example-box {
-  background: #f5f5f5;
-  padding: 16px;
-  border-radius: 6px;
-  font-family: monospace;
-  font-size: 13px;
-  color: #606266;
-  line-height: 1.6;
 }
 
 .config-actions {
@@ -952,96 +744,83 @@ onMounted(() => {
 }
 
 .template-tree {
-  max-height: 220px;
   overflow-y: auto;
   background: white;
   border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  padding: 8px;
-}
-
-.department-page {
-  display: flex;
-  height: 100%;
-}
-
-.department-sidebar {
-  width: 300px;
-  border-right: 1px solid #e8e8e8;
-  display: flex;
-  flex-direction: column;
-  background: #fafafa;
-}
-
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.sidebar-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.sidebar-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.search-box {
-  padding: 14px 20px;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.search-box :deep(.el-input__wrapper) {
-  border-radius: 6px;
-}
-
-.department-sidebar :deep(.el-tree) {
-  flex: 1;
-  overflow-y: auto;
+  border-radius: 8px;
   padding: 12px;
+  font-size: 14px;
 }
 
-.department-sidebar :deep(.el-tree-node__content) {
-  padding: 8px 4px;
-}
-
-.tree-node {
+.custom-tree-node {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.tree-node span {
+  gap: 6px;
   font-size: 14px;
   color: #303133;
-  flex: 1;
 }
 
-.node-actions {
+.custom-tree-node svg {
+  color: #409eff;
+}
+
+.template-layout {
   display: flex;
-  gap: 6px;
-  opacity: 0;
-  transition: opacity 0.2s;
+  gap: 24px;
+  margin-top: 16px;
 }
 
-.tree-node:hover .node-actions {
-  opacity: 1;
-}
-
-.department-content {
+.template-left {
   flex: 1;
-  padding: 24px;
+  min-width: 0;
 }
 
-.empty-hint {
-  text-align: center;
+.template-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.template-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.template-preview-box {
+  background: #fafafa;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  padding: 16px;
+  min-height: 320px;
+}
+
+.whitelist-layout {
+  display: flex;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.whitelist-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.whitelist-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-example {
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 10px;
+  font-family: monospace;
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.8;
+  border: 1px solid #e8e8e8;
+  min-height: 200px;
 }
 
 .ml-2 {

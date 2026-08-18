@@ -171,6 +171,10 @@ export const authAPI = {
 
   resetPassword: async (phone, code, password) => {
     return instance.post('/auth/reset-password', { phone, code, password })
+  },
+
+  getCurrentUser: async (userId) => {
+    return instance.get('/auth/me', { params: { userId } })
   }
 }
 
@@ -315,8 +319,8 @@ export const adminAPI = {
     return instance.put(`/admin/users/${id}/quota`, { quota })
   },
 
-  register: async (username, password, role = 'USER', departmentId = null) => {
-    return instance.post('/admin/users', { username, password, role, departmentId })
+  register: async (username, password, role = 'USER') => {
+    return instance.post('/admin/users', { username, password, role })
   },
 
   updateUser: async (id, data) => {
@@ -357,22 +361,6 @@ export const adminAPI = {
 
   getLogs: async (params) => {
     return instance.get('/operation-logs', { params })
-  },
-
-  getDepartments: async () => {
-    return instance.get('/departments')
-  },
-
-  createDepartment: async (data) => {
-    return instance.post('/departments', { name: data.name, parentId: data.parent_id, sortOrder: 0 })
-  },
-
-  updateDepartment: async (id, data) => {
-    return instance.put(`/departments/${id}`, { name: data.name, parentId: data.parent_id })
-  },
-
-  deleteDepartment: async (id) => {
-    return instance.delete(`/departments/${id}`)
   }
 }
 
@@ -398,28 +386,6 @@ export const folderTemplateAPI = {
   }
 }
 
-export const departmentAPI = {
-  getDepartments: async () => {
-    return instance.get('/departments')
-  },
-
-  getDepartmentTree: async () => {
-    return instance.get('/departments/tree')
-  },
-
-  createDepartment: async (name, parentId, sortOrder = 0) => {
-    return instance.post('/departments', { name, parentId, sortOrder })
-  },
-
-  updateDepartment: async (id, data) => {
-    return instance.put(`/departments/${id}`, data)
-  },
-
-  deleteDepartment: async (id) => {
-    return instance.delete(`/departments/${id}`)
-  }
-}
-
 export const systemConfigAPI = {
   getAllConfigs: async () => {
     return instance.get('/system-configs')
@@ -442,4 +408,4 @@ export const systemConfigAPI = {
   }
 }
 
-export default { authAPI, fileAPI, folderAPI, tagAPI, adminAPI, departmentAPI, systemConfigAPI, folderTemplateAPI }
+export default { authAPI, fileAPI, folderAPI, tagAPI, adminAPI, systemConfigAPI, folderTemplateAPI }

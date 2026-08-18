@@ -125,6 +125,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { authAPI } from '@/api'
 
 const router = useRouter()
 
@@ -170,7 +171,7 @@ const handleSendCode = async () => {
   
   loading.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await authAPI.sendResetCode(form.phone)
     ElMessage.success('验证码已发送')
     countdown.value = 60
     
@@ -181,7 +182,7 @@ const handleSendCode = async () => {
       }
     }, 1000)
   } catch (error) {
-    ElMessage.error('发送失败，请重试')
+    ElMessage.error(error.response?.data?.message || '发送失败，请重试')
   } finally {
     loading.value = false
   }
@@ -193,11 +194,11 @@ const handleResetPassword = async () => {
   
   loading.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await authAPI.resetPassword(form.phone, form.code, form.password)
     ElMessage.success('密码重置成功')
     router.push('/login')
   } catch (error) {
-    ElMessage.error('重置失败，请重试')
+    ElMessage.error(error.response?.data?.message || '重置失败，请重试')
   } finally {
     loading.value = false
   }

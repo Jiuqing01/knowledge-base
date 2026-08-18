@@ -25,6 +25,14 @@ jwt:
 app:
   default-storage-quota: 1073741824
 
+sms:
+  aliyun:
+    enabled: false
+    access-key-id: your-access-key-id
+    access-key-secret: your-access-key-secret
+    sign-name: your-sign-name
+    template-code: your-template-code
+
 file:
   upload-dir: uploads
   max-file-size: 524288000
